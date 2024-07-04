@@ -1,1 +1,1 @@
-UPDATE users SET unsubscribed_in = unsubscribed_in || $1 WHERE id = $2;
+UPDATE users SET unsubscribed_in = unsubscribed_in || ARRAY[$1] WHERE id = $2;

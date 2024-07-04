@@ -1,1 +1,1 @@
-UPDATE users SET unsubscribed_all = TRUE, unsubscribed_in = [] WHERE id = $1;
+UPDATE users SET unsubscribed_all = TRUE, unsubscribed_in = '{}' WHERE id = $1;

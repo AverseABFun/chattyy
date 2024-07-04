@@ -62,53 +62,85 @@ app.post('/commands/chat', async (req, res) => {
     res.send();
     var chat = (await client.query(loadPremadeQuery("chats/getRandom"), [req.body.user_id])).rows[0];
     if (chat == undefined) {
-        if (!(await web.conversations.info({"channel": req.body.channel_id})).channel.is_private) {
-            web.chat.postEphemeral({
-                "channel": req.body.channel_id,
-                "user": req.body.user_id,
-                "text": ":warning: Error: Command ran in public channel. Please run command in private channel, dm, or group."
-            });
-            web.chat.delete({
-                "channel": req.body.channel_id,
-                "ts": statusTs
-            })
-            return;
-        }
-        var members = (await web.conversations.members({
-            "channel": req.body.channel_id
-        })).members;
-        members.splice(members.indexOf(process.env.SLACK_APP_USER_ID), 1);
-        chat = (await client.query(loadPremadeQuery("chats/create"), [req.body.user_id]));
-        for (var member of members) {
-            var userData = await client.query(loadPremadeQuery("userRow/get"), [member]);
-            if (userData.rowCount == 0) {
-                await client.query(loadPremadeQuery("userRow/create"), [member]);
-                continue;
-            }
-            if (userData.rows[0].unsubscribed_all || userData.rows[0].unsubscribed_in.includes(req.body.channel_id)) {
-                continue;
-            }
-            const convoId = (await web.conversations.open({
-                "users": [member]
-            })).channel.id
-            web.chat.postMessage({
-                "blocks": loadPremadeBlocks("new_chatty_chat", {
-                    "{1}": req.body.channel_id,
-                    "{2}": member
-                }),
-                "channel": convoId
-            })
-        }
-        web.chat.update({
+        web.chat.postEphemeral({
             "channel": req.body.channel_id,
-            "ts": statusTs,
-            "text": "Sent out invites to chatty chat. Remember to keep it anonymous!"
+            "user": req.body.user_id,
+            "text": ":warning: Cannot find available chat. If you want to create one in the current channel, run /create_chat."
+        });
+        web.chat.delete({
+            "channel": req.body.channel_id,
+            "ts": statusTs
+        })
+        return;
+    }
+
+});
+
+app.post('/interactivity', async (req, res) => {
+    const payload = JSON.parse(req.body.payload);
+    switch (payload.type) {
+        case "interactive_message":
+            const action_id = new String(payload.actions[0].action_id)
+            if (action_id.startsWith("yes-join-button:")) {
+
+            } else if (action_id.startsWith("no-dont-join-button:")) {
+                
+            }
+            break;
+    }
+    res.statusCode = 200;
+    res.send();
+})
+
+app.post('/commands/create_chat', async (req, res) => {
+    if (!(await web.conversations.info({"channel": req.body.channel_id})).channel.is_private) {
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": ":warning: Error: Command ran in public channel. Please run command in private channel, dm, or group."
+        });
+        web.chat.delete({
+            "channel": req.body.channel_id,
+            "ts": statusTs
+        })
+        return;
+    }
+    var members = (await web.conversations.members({
+        "channel": req.body.channel_id
+    })).members;
+    members.splice(members.indexOf(process.env.SLACK_APP_USER_ID), 1);
+    chat = (await client.query(loadPremadeQuery("chats/create"), [req.body.user_id]));
+    for (var member of members) {
+        var userData = await client.query(loadPremadeQuery("userRow/get"), [member]);
+        if (userData.rowCount == 0) {
+            await client.query(loadPremadeQuery("userRow/create"), [member]);
+            continue;
+        }
+        if (userData.rows[0].unsubscribed_all || userData.rows[0].unsubscribed_in.includes(req.body.channel_id)) {
+            continue;
+        }
+        const convoId = (await web.conversations.open({
+            "users": member
+        })).channel.id
+        web.chat.postMessage({
+            "blocks": loadPremadeBlocks("new_chatty_chat", {
+                "{1}": req.body.channel_id,
+                "{2}": member
+            }),
+            "channel": convoId
         })
     }
+    web.chat.update({
+        "channel": req.body.channel_id,
+        "ts": statusTs,
+        "text": "Sent out invites to chatty chat. Remember to keep it anonymous!"
+    })
+    res.statusCode = 200;
+    res.send();
 });
 
 app.post('/commands/unsubscribe', async (req, res) => {
-    
+
     res.statusCode = 200;
     res.send();
     var channel = req.body.channel_id;
@@ -120,6 +152,13 @@ app.post('/commands/unsubscribe', async (req, res) => {
     channel = regexMatch == undefined ? channel : regexMatch;
     if (req.body.text == "all") {
         channel = "all"
+    }
+    if (channel == (await web.conversations.open({"users":req.body.user_id})).channel.id) {
+        web.chat.postMessage({
+            "channel": channel,
+            "text": "There are no users in this chat! If you want to unsubscribe from all channels, run /unsubscribe all."
+        })
+        return;
     }
     if (!(await web.conversations.info({"channel": req.body.channel_id})).channel.is_private) {
         web.chat.postEphemeral({
@@ -133,6 +172,7 @@ app.post('/commands/unsubscribe', async (req, res) => {
     var userData = await client.query(loadPremadeQuery("userRow/get"), [req.body.user_id]);
     if (userData.rowCount == 0) {
         await client.query(loadPremadeQuery("userRow/create"), [req.body.user_id]);
+        userData = await client.query(loadPremadeQuery("userRow/get"), [req.body.user_id]);
     }
     if (userData.rows[0].unsubscribed_all) {
         web.chat.postEphemeral({
@@ -176,10 +216,20 @@ app.post('/commands/resubscribe', async (req, res) => {
     res.send();
     var channel = req.body.channel_id;
     const regex = /<#(C[A-Z0-9]*)\|[a-zA-Z0-9_\-]*>/gm;
-    var regexMatch = req.body.text.matchAll(regex)[0][1];
+    var regexMatch = req.body.text.matchAll(regex)[0];
+    if (regexMatch != undefined) {
+        regexMatch = regexMatch[0];
+    }
     channel = regexMatch == undefined ? channel : regexMatch;
     if (req.body.text == "all") {
         channel = "all"
+    }
+    if (channel == (await web.conversations.open({"users":req.body.user_id})).channel.id) {
+        web.chat.postMessage({
+            "channel": channel,
+            "text": "There are no users in this chat! If you want to resubscribe to all channels, run /resubscribe all."
+        })
+        return;
     }
     if (!(await web.conversations.info({"channel": req.body.channel_id})).channel.is_private) {
         web.chat.postEphemeral({
@@ -203,7 +253,7 @@ app.post('/commands/resubscribe', async (req, res) => {
         
         return;
     }
-    if (!userData.rows[0].unsubscribed_in.includes(req.body.channel_id)) {
+    if (!userData.rows[0].unsubscribed_in.includes(req.body.channel_id) && channel != "all") {
         web.chat.postEphemeral({
             "channel": req.body.channel_id,
             "user": req.body.user_id,

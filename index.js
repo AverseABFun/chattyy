@@ -107,6 +107,130 @@ app.post('/commands/chat', async (req, res) => {
     }
 });
 
+app.post('/commands/unsubscribe', async (req, res) => {
+    
+    res.statusCode = 200;
+    res.send();
+    var channel = req.body.channel_id;
+    const regex = /<#(C[A-Z0-9]*)\|[a-zA-Z0-9_\-]*>/gm;
+    var regexMatch = req.body.text.matchAll(regex)[0];
+    if (regexMatch != undefined) {
+        regexMatch = regexMatch[0];
+    }
+    channel = regexMatch == undefined ? channel : regexMatch;
+    if (req.body.text == "all") {
+        channel = "all"
+    }
+    if (!(await web.conversations.info({"channel": req.body.channel_id})).channel.is_private) {
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": ":warning: Error: Command ran in public channel. Please run command in private channel, dm, or group."
+        });
+        
+        return;
+    }
+    var userData = await client.query(loadPremadeQuery("userRow/get"), [req.body.user_id]);
+    if (userData.rowCount == 0) {
+        await client.query(loadPremadeQuery("userRow/create"), [req.body.user_id]);
+    }
+    if (userData.rows[0].unsubscribed_all) {
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": "You are already unsubscribed from all channels!"
+        });
+        
+        return;
+    }
+    if (userData.rows[0].unsubscribed_in.includes(req.body.channel_id)) {
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": "You are already unsubscribed from this channel!"
+        });
+        
+        return;
+    }
+    if (channel == "all") {
+        await client.query(loadPremadeQuery("userRow/unsubscribeAll"), [req.body.user_id]);
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": "You have been unsubscribed from all channels. To undo this, run /resubscribe all."
+        });
+        
+    } else {
+        await client.query(loadPremadeQuery("userRow/unsubscribe"), [channel, req.body.user_id]);
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": `You have been unsubscribed from channel <#${channel}>. To undo this, run /resubscribe <#${channel}>.`
+        });
+        
+    }
+});
+
+app.post('/commands/resubscribe', async (req, res) => {
+    res.statusCode = 200;
+    res.send();
+    var channel = req.body.channel_id;
+    const regex = /<#(C[A-Z0-9]*)\|[a-zA-Z0-9_\-]*>/gm;
+    var regexMatch = req.body.text.matchAll(regex)[0][1];
+    channel = regexMatch == undefined ? channel : regexMatch;
+    if (req.body.text == "all") {
+        channel = "all"
+    }
+    if (!(await web.conversations.info({"channel": req.body.channel_id})).channel.is_private) {
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": ":warning: Error: Command ran in public channel. Please run command in private channel, dm, or group."
+        });
+        
+        return;
+    }
+    var userData = await client.query(loadPremadeQuery("userRow/get"), [req.body.user_id]);
+    if (userData.rowCount == 0) {
+        await client.query(loadPremadeQuery("userRow/create"), [req.body.user_id]);
+    }
+    if (!userData.rows[0].unsubscribed_all && channel == "all") {
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": "You aren't unsubscribed from all channels!"
+        });
+        
+        return;
+    }
+    if (!userData.rows[0].unsubscribed_in.includes(req.body.channel_id)) {
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": "You aren't unsubscribed from this channel!"
+        });
+        
+        return;
+    }
+    if (channel == "all") {
+        await client.query(loadPremadeQuery("userRow/resubscribeAll"), [req.body.user_id]);
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": "You have been resubscribed to all channels. To undo this, run /unsubscribe all."
+        });
+        
+    } else {
+        await client.query(loadPremadeQuery("userRow/resubscribe"), [channel, req.body.user_id]);
+        web.chat.postEphemeral({
+            "channel": req.body.channel_id,
+            "user": req.body.user_id,
+            "text": `You have been resubscribed to channel <#${channel}>. To undo this, run /unsubscribe <#${channel}>.`
+        });
+        
+    }
+});
+
 app.get('/', (req, res) => {
     console.log("Status request")
     res.send("Chattyy is online!")

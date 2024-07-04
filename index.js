@@ -17,6 +17,25 @@ function loadPremadeQuery(name) {
     _premadeQueryCache[name] = value;
     return value;
 }
+var _premadeBlocksCache = {}
+function loadPremadeBlocks(name, substitutions = []) {
+    function substitute(value) {
+        var out = value;
+        for (var item of substitutions.keys()) {
+            out = out.replaceAll(item, substitutions[item])
+        }
+        return out
+    }
+    if (Object.keys(_premadeBlocksCache).includes(name)) {
+        return substitute(_premadeBlocksCache[name])
+    }
+    if (!fs.existsSync("blocks/"+name+".json")) {
+        throw new Error("Premade blocks file does not exist");
+    }
+    const value = fs.readFileSync("blocks/"+name+".json").toString("utf8");
+    _premadeBlocksCache[name] = value;
+    return substitute(value);
+}
 
 const token = process.env.SLACK_TOKEN;
 const web = new WebClient(token);
@@ -34,30 +53,58 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.post('/commands/chat', async (req, res) => {
-    const ephemeralTs = (await web.chat.postEphemeral({
+    const statusTs = (await web.chat.postMessage({
         "channel": req.body.channel_id,
-        "user": req.body.user_id,
         "text": ":spin-loading: Setting up chat..."
-    })).message_ts;
-    console.log(ephemeralTs);
-    var userData = await client.query(loadPremadeQuery("userRow/get"), [req.body.user_id]);
-    var userRow;
-    console.log(userData.rows.length)
-    if (userData.rows.length == 0) {
-        await client.query(loadPremadeQuery("userRow/create"), [req.body.user_id, [ephemeralTs], [req.body.channel_id]]);
-        userData = await client.query(loadPremadeQuery("userRow/get"), [req.body.user_id]);
-        userRow = userData.rows[0];
-    } else {
-        userRow = userData.rows[0];
-        userRow.chatstartts.push(ephemeralTs);
-        userRow.chatstartchannel.push(req.body.channel_id);
-        await client.query(loadPremadeQuery("userRow/modify"), [userRow.chatstartts, userRow.chatstartchannel, req.body.user_id]);
-        userData = await client.query(loadPremadeQuery("userRow/get"), [req.body.user_id]);
-        userRow = userData.rows[0];
-    }
-    console.log(userRow)
+    })).ts;
+    console.log(statusTs);
     res.statusCode = 200;
     res.send();
+    var chat = (await client.query(loadPremadeQuery("chats/getRandom"), [req.body.user_id])).rows[0];
+    if (chat == undefined) {
+        if (!(await web.conversations.info({"channel": req.body.channel_id})).channel.is_private) {
+            web.chat.postEphemeral({
+                "channel": req.body.channel_id,
+                "user": req.body.user_id,
+                "text": ":warning: Error: Command ran in public channel. Please run command in private channel, dm, or group."
+            });
+            web.chat.delete({
+                "channel": req.body.channel_id,
+                "ts": statusTs
+            })
+            return;
+        }
+        var members = (await web.conversations.members({
+            "channel": req.body.channel_id
+        })).members;
+        members.splice(members.indexOf(process.env.SLACK_APP_USER_ID), 1);
+        chat = (await client.query(loadPremadeQuery("chats/create"), [req.body.user_id]));
+        for (var member of members) {
+            var userData = await client.query(loadPremadeQuery("userRow/get"), [member]);
+            if (userData.rowCount == 0) {
+                await client.query(loadPremadeQuery("userRow/create"), [member]);
+                continue;
+            }
+            if (userData.rows[0].unsubscribed_all || userData.rows[0].unsubscribed_in.includes(req.body.channel_id)) {
+                continue;
+            }
+            const convoId = (await web.conversations.open({
+                "users": [member]
+            })).channel.id
+            web.chat.postMessage({
+                "blocks": loadPremadeBlocks("new_chatty_chat", {
+                    "{1}": req.body.channel_id,
+                    "{2}": member
+                }),
+                "channel": convoId
+            })
+        }
+        web.chat.update({
+            "channel": req.body.channel_id,
+            "ts": statusTs,
+            "text": "Sent out invites to chatty chat. Remember to keep it anonymous!"
+        })
+    }
 });
 
 app.get('/', (req, res) => {

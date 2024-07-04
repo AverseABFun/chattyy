@@ -1,0 +1,1 @@
+SELECT * FROM chats WHERE NOT ($1 = ANY (users)) ORDER BY random() LIMIT 1;

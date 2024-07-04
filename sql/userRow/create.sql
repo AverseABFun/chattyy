@@ -1,1 +1,1 @@
-INSERT INTO users(id, chatStartTs, chatStartChannel) VALUES ( $1, $2, $3 );
+INSERT INTO users(id, unsubscribed_all, unsubscribed_in) VALUES ( $1, FALSE, [] );

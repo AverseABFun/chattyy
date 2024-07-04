@@ -1,1 +1,0 @@
-UPDATE users SET chatStartTs = $1, chatStartChannel = $2 WHERE id = $3;

@@ -1,0 +1,1 @@
+UPDATE users SET unsubscribed_in = unsubscribed_in || $1 WHERE id = $2;

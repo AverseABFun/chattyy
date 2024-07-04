@@ -1,0 +1,43 @@
+{
+	"blocks": [
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "Someone created a chattyy chat in <#{1}>! Want to join?"
+			}
+		},
+		{
+			"type": "actions",
+			"elements": [
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Yes",
+						"emoji": true
+					},
+					"value": "yes-{2}",
+					"action_id": "yes-join-button:{2}"
+				},
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "No",
+						"emoji": true
+					},
+					"value": "no-{2}",
+					"action_id": "no-dont-join-button:{2}"
+				}
+			]
+		},
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "If you don't want to ever be notified of chattyy chats in <#{1}>, then run /unsubscribe <#{1}>.\nYou can also unsubscribe from all chatty chats with /unsubscribe all."
+			}
+		}
+	]
+}

@@ -5,6 +5,6 @@ CREATE TABLE IF NOT EXISTS chats (
 
 CREATE TABLE IF NOT EXISTS users (
     id text PRIMARY KEY,
-    chatStartTs text[] NOT NULL,
-    chatStartChannel text[] NOT NULL
+    unsubscribed_all boolean NOT NULL,
+    unsubscribed_in text[] NOT NULL
 );

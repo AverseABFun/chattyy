@@ -18,7 +18,8 @@
   "homepage": "https://github.com/AverseABFun/chattyy#readme",
   "dependencies": {
     "@slack/web-api": "^7.3.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
   },
   "type": "module"
 }

@@ -1,0 +1,1 @@
+INSERT INTO users(id, chatStartTs, chatStartChannel) VALUES ( $1, $2, $3 );

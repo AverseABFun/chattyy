@@ -1,0 +1,24 @@
+{
+  "name": "chattyy",
+  "version": "1.0.0",
+  "description": "hackclub slack bot",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AverseABFun/chattyy.git"
+  },
+  "author": "meeeeeeeeeeeee",
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/AverseABFun/chattyy/issues"
+  },
+  "homepage": "https://github.com/AverseABFun/chattyy#readme",
+  "dependencies": {
+    "@slack/web-api": "^7.3.0",
+    "dotenv": "^16.4.5"
+  },
+  "type": "module"
+}
